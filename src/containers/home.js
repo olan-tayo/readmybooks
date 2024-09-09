@@ -1,12 +1,15 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist/build/pdf";
+import Audio from "./components/Audio/Audio";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.min.mjs`;
 
 const Home = () => {
   const [isPdfUploaded, setIsPdfUploaded] = useState(false);
-  const [audioUrl, setAudioUrl] = useState("");
   const [text, setText] = useState("");
+  const [isPaused, setIsPaused] = useState(false);
+  const [utterance, setUtterance] = useState(null);
+  const [initialControl, setInitialControl] = useState(true);
 
   const sanitizeText = (text) => {
     return text
@@ -15,15 +18,24 @@ const Home = () => {
       .trim();
   };
 
-  const handleTextToSpeech = (textContent) => {
-    const sanitizedText = sanitizeText(textContent);
-    const utterance = new SpeechSynthesisUtterance(sanitizedText);
-    setAudioUrl(utterance);
-    window.speechSynthesis.speak(utterance);
+  const handlePlayAudio = () => {
+    const synth = window.speechSynthesis;
 
-    utterance.onend = () => {
-      console.log("Speech synthesis finished.");
-    };
+    if (isPaused) {
+      synth.resume();
+    }
+
+    synth.speak(utterance);
+    setInitialControl(false);
+    setIsPaused(false);
+  };
+
+  const handlePause = () => {
+    const synth = window.speechSynthesis;
+
+    synth.pause();
+    setInitialControl(false);
+    setIsPaused(true);
   };
 
   const handlePDF = (event) => {
@@ -50,10 +62,31 @@ const Home = () => {
 
       textContent = pageTexts.join(" ");
       setText(textContent);
-      handleTextToSpeech(textContent);
+      handlePlayAudio();
       setIsPdfUploaded(true);
     };
   };
+
+  const handleStop = () => {
+    const synth = window.speechSynthesis;
+
+    synth.cancel();
+    setInitialControl(true);
+    setIsPaused(false);
+  };
+
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    let speech = sanitizeText(text);
+    const rawUtterance = new SpeechSynthesisUtterance(speech);
+
+    setUtterance(rawUtterance);
+    setInitialControl(true);
+
+    return () => {
+      synth.cancel();
+    };
+  }, [text]);
 
   return (
     <div>
@@ -67,12 +100,18 @@ const Home = () => {
         </div>
       ) : (
         <div className="flex flex-col gap-3 justify-center items-center h-screen">
-          <audio controls src={audioUrl} />
+          {/* <audio controls src={audioUrl} /> */}
+          <Audio
+            handlePlay={handlePlayAudio}
+            handlePause={handlePause}
+            play={isPaused}
+            initialControl={initialControl}
+          />
           <button
+            onClick={handleStop}
             className="border px-4 py-2 rounded-lg text-sm mt-2"
-            onClick={() => handleTextToSpeech(text)}
           >
-            Read again
+            Stop Audio
           </button>
         </div>
       )}
