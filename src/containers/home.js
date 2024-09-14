@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist/build/pdf";
-import Audio from "./components/Audio/Audio";
+import Audio from "../components/Audio/Audio";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.min.mjs`;
 
@@ -10,6 +10,9 @@ const Home = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [utterance, setUtterance] = useState(null);
   const [initialControl, setInitialControl] = useState(true);
+  const [volume, setVolume] = useState(1);
+  const [voices, setVoices] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState([]);
 
   const sanitizeText = (text) => {
     return text
@@ -75,11 +78,34 @@ const Home = () => {
     setIsPaused(false);
   };
 
+  const handleVolume = () => {
+    setVolume(Math.random().toFixed(1));
+  };
+
+  const handleSelectedVoice = (data) => {
+    window.speechSynthesis.cancel();
+    setInitialControl(true);
+    setSelectedVoice(data);
+    if (utterance) {
+      const newUtterance = new SpeechSynthesisUtterance(utterance.text);
+      newUtterance.voice = data;
+      newUtterance.rate = utterance.rate;
+      newUtterance.pitch = utterance.pitch;
+      newUtterance.volume = utterance.volume;
+
+      // Speak the new utterance with the updated voice
+      window.speechSynthesis.speak(newUtterance);
+    }
+  };
+
   useEffect(() => {
     const synth = window.speechSynthesis;
-    let speech = sanitizeText(text);
+    const speech = sanitizeText(text);
     const rawUtterance = new SpeechSynthesisUtterance(speech);
-
+    window.speechSynthesis.onvoiceschanged = () => {
+      const voice = window.speechSynthesis.getVoices();
+      setVoices(voice);
+    };
     setUtterance(rawUtterance);
     setInitialControl(true);
 
@@ -87,6 +113,14 @@ const Home = () => {
       synth.cancel();
     };
   }, [text]);
+
+  useEffect(() => {
+    if (utterance) {
+      utterance.rate = volume;
+    }
+  }, [volume, utterance, selectedVoice]);
+
+  console.log(utterance);
 
   return (
     <div>
@@ -100,12 +134,14 @@ const Home = () => {
         </div>
       ) : (
         <div className="flex flex-col gap-3 justify-center items-center h-screen">
-          {/* <audio controls src={audioUrl} /> */}
           <Audio
             handlePlay={handlePlayAudio}
             handlePause={handlePause}
             play={isPaused}
             initialControl={initialControl}
+            handleVolume={handleVolume}
+            voices={voices}
+            handleSelectedVoice={handleSelectedVoice}
           />
           <button
             onClick={handleStop}
